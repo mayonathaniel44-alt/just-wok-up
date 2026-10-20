@@ -1,0 +1,288 @@
+import { useEffect, useMemo, useState } from "react";
+import "./App.css";
+
+const peso = (amount) =>
+  new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+  }).format(amount);
+
+function App() {
+  const [categories, setCategories] = useState([]);
+  const [activeCategory, setActiveCategory] = useState("All");
+  const [cart, setCart] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadMenu() {
+      try {
+        const response = await fetch("http://localhost:5000/api/menu", {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) throw new Error("Could not load menu.");
+
+        const result = await response.json();
+        setCategories(result.data || []);
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          setError("Unable to load the menu. Check that the backend is running.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }
+
+    loadMenu();
+    return () => controller.abort();
+  }, []);
+
+  const items = useMemo(
+    () =>
+      categories.flatMap((category) =>
+        category.items.map((item) => ({
+          ...item,
+          categoryName: category.name,
+        })),
+      ),
+    [categories],
+  );
+
+  const filteredItems = items.filter((item) => {
+    const matchesCategory =
+      activeCategory === "All" || item.categoryName === activeCategory;
+    const matchesSearch = item.name
+      .toLowerCase()
+      .includes(search.toLowerCase());
+
+    return matchesCategory && matchesSearch;
+  });
+
+  const addToCart = (item) => {
+    setCart((current) => {
+      const existing = current.find((entry) => entry.id === item.id);
+
+      if (existing) {
+        return current.map((entry) =>
+          entry.id === item.id
+            ? { ...entry, quantity: entry.quantity + 1 }
+            : entry,
+        );
+      }
+
+      return [...current, { ...item, quantity: 1 }];
+    });
+  };
+
+  const changeQuantity = (id, amount) => {
+    setCart((current) =>
+      current
+        .map((item) =>
+          item.id === id
+            ? { ...item, quantity: item.quantity + amount }
+            : item,
+        )
+        .filter((item) => item.quantity > 0),
+    );
+  };
+
+  const total = cart.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0,
+  );
+
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <a className="brand" href="#" aria-label="Just Wok Up home">
+          <span className="brand-mark">JW</span>
+          <span>
+            <strong>JUST WOK UP</strong>
+            <small>CAFÉ · ORDER ONLINE</small>
+          </span>
+        </a>
+        <a className="cart-link" href="#your-order">
+          Your order <span>{cart.reduce((sum, item) => sum + item.quantity, 0)}</span>
+        </a>
+      </header>
+
+      <main>
+        <section className="hero">
+          <p className="eyebrow">FRESHLY MADE · MADE FOR YOU</p>
+          <h1>Good food.<br />No waiting in line.</h1>
+          <p className="hero-copy">
+            Explore the menu, customize your order, and let us handle the rest.
+          </p>
+          <div className="hero-note">
+            <span className="status-dot" />
+            <span>Ordering menu preview</span>
+            <span className="preview-label">DEVELOPMENT</span>
+          </div>
+        </section>
+
+        <section className="menu-section">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">WHAT ARE YOU CRAVING?</p>
+              <h2>Explore the menu</h2>
+            </div>
+            <span className="item-count">{items.length} items</span>
+          </div>
+
+          <input
+            className="search-input"
+            type="search"
+            placeholder="Search dishes..."
+            aria-label="Search dishes"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+
+          <div className="category-list">
+            {["All", ...categories.map((category) => category.name)].map(
+              (category) => (
+                <button
+                  key={category}
+                  className={`category-button ${
+                    activeCategory === category ? "active" : ""
+                  }`}
+                  onClick={() => setActiveCategory(category)}
+                >
+                  {category}
+                </button>
+              ),
+            )}
+          </div>
+
+          {loading && <p className="message">Loading menu...</p>}
+          {error && <p className="error-message">{error}</p>}
+
+          {!loading && !error && filteredItems.length === 0 && (
+            <p className="message">No dishes found. Try another search.</p>
+          )}
+
+          <div className="menu-grid">
+            {filteredItems.map((item) => (
+              <article className="menu-card" key={item.id}>
+                <div className="dish-placeholder">
+                  <span>{item.categoryName}</span>
+                  <span className="dish-initial">
+                    {item.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <div className="dish-info">
+                  <p className="dish-category">{item.categoryName}</p>
+                  <h3>{item.name}</h3>
+                  <p className="dish-description">
+                    {item.description || "Freshly prepared for your order."}
+                  </p>
+                  <div className="dish-footer">
+                    <strong>{peso(item.price)}</strong>
+                    <button
+                      className="add-button"
+                      onClick={() => addToCart(item)}
+                      aria-label={`Add ${item.name} to order`}
+                    >
+                      + Add
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="order-section" id="your-order">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">ALMOST THERE</p>
+              <h2>Your order</h2>
+            </div>
+            <span className="item-count">{cart.length} dishes</span>
+          </div>
+
+          {cart.length === 0 ? (
+            <div className="empty-cart">
+              <span className="empty-cart-icon">＋</span>
+              <strong>Your order is empty</strong>
+              <p>Add a dish from the menu to get started.</p>
+            </div>
+          ) : (
+            <>
+              <div className="cart-items">
+                {cart.map((item) => (
+                  <div className="cart-item" key={item.id}>
+                    <div className="cart-item-info">
+                      <strong>{item.name}</strong>
+                      <span>{peso(item.price)} each</span>
+                    </div>
+                    <div className="quantity-controls">
+                      <button
+                        onClick={() => changeQuantity(item.id, -1)}
+                        aria-label={`Remove one ${item.name}`}
+                      >
+                        −
+                      </button>
+                      <span>{item.quantity}</span>
+                      <button
+                        onClick={() => changeQuantity(item.id, 1)}
+                        aria-label={`Add one ${item.name}`}
+                      >
+                        +
+                      </button>
+                    </div>
+                    <strong className="line-total">
+                      {peso(item.price * item.quantity)}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+
+              <label className="notes-label" htmlFor="order-notes">
+                Order notes
+              </label>
+              <textarea
+                id="order-notes"
+                placeholder="Any special requests? (optional)"
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                rows={3}
+              />
+
+              <div className="total-row">
+                <span>Subtotal</span>
+                <strong>{peso(total)}</strong>
+              </div>
+              <p className="checkout-hint">
+                This is a preview. Orders are not submitted to the café yet.
+              </p>
+              <button
+                className="checkout-button"
+                onClick={() =>
+                  window.alert(
+                    "Checkout will be enabled after we implement the order API.",
+                  )
+                }
+              >
+                Continue to checkout · {peso(total)}
+              </button>
+            </>
+          )}
+        </section>
+      </main>
+
+      <footer className="footer">
+        <strong>JUST WOK UP CAFÉ</strong>
+        <p>Life begins after coffee.</p>
+        <small>Ordering website prototype · Development version</small>
+      </footer>
+    </div>
+  );
+}
+
+export default App;

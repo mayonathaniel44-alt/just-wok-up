@@ -1,0 +1,73 @@
+
+const express = require("express");
+const { Pool } = require("pg");
+
+const router = express.Router();
+
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: Number(process.env.DB_PORT || 5432),
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+});
+
+// GET /api/menu
+// Returns active categories and available menu items.
+router.get("/", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        c.id AS category_id,
+        c.name AS category_name,
+        c.description AS category_description,
+        m.id AS item_id,
+        m.name AS item_name,
+        m.description AS item_description,
+        m.price,
+        m.image_url
+      FROM menu_categories c
+      LEFT JOIN menu_items m
+        ON m.category_id = c.id
+        AND m.is_available = TRUE
+      WHERE c.is_active = TRUE
+      ORDER BY c.name, m.name;
+    `);
+
+    const categories = new Map();
+
+    for (const row of result.rows) {
+      if (!categories.has(row.category_id)) {
+        categories.set(row.category_id, {
+          id: row.category_id,
+          name: row.category_name,
+          description: row.category_description,
+          items: [],
+        });
+      }
+
+      if (row.item_id !== null) {
+        categories.get(row.category_id).items.push({
+          id: row.item_id,
+          name: row.item_name,
+          description: row.item_description,
+          price: Number(row.price),
+          imageUrl: row.image_url,
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      data: Array.from(categories.values()),
+    });
+  } catch (error) {
+    console.error("Menu API error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Unable to retrieve the menu.",
+    });
+  }
+});
+
+module.exports = router;

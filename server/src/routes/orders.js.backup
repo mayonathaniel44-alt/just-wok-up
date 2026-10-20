@@ -1,0 +1,193 @@
+const express = require("express");
+const { Pool } = require("pg");
+
+const router = express.Router();
+
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: Number(process.env.DB_PORT || 5432),
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+});
+
+const allowedStatuses = [
+  "pending",
+  "confirmed",
+  "preparing",
+  "ready",
+  "served",
+  "cancelled",
+];
+
+// List orders, including their items and table information.
+router.get("/", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        o.id,
+        o.order_number AS "orderNumber",
+        o.order_type AS "orderType",
+        o.order_status AS "orderStatus",
+        o.payment_status AS "paymentStatus",
+        o.subtotal,
+        o.notes,
+        o.created_at AS "createdAt",
+        o.updated_at AS "updatedAt",
+        rt.table_number AS "tableNumber",
+        COALESCE(items.items, '[]'::json) AS items
+      FROM orders o
+      LEFT JOIN restaurant_tables rt ON rt.id = o.table_id
+      LEFT JOIN LATERAL (
+        SELECT json_agg(
+          json_build_object(
+            'id', oi.id,
+            'menuItemId', oi.menu_item_id,
+            'name', oi.item_name,
+            'unitPrice', oi.unit_price,
+            'quantity', oi.quantity,
+            'lineTotal', oi.line_total,
+            'notes', oi.item_notes
+          ) ORDER BY oi.id
+        ) AS items
+        FROM order_items oi
+        WHERE oi.order_id = o.id
+      ) items ON TRUE
+      ORDER BY
+        CASE WHEN o.order_status IN ('served', 'cancelled')
+          THEN 1 ELSE 0 END,
+        o.created_at DESC
+      LIMIT 200
+    `);
+
+    res.json({
+      success: true,
+      data: result.rows,
+    });
+  } catch (error) {
+    console.error("List orders error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Unable to load orders.",
+    });
+  }
+});
+
+// Get the details of one order.
+router.get("/:id", async (req, res) => {
+  const id = Number(req.params.id);
+
+  if (!Number.isSafeInteger(id) || id < 1) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid order ID.",
+    });
+  }
+
+  try {
+    const result = await pool.query(`
+      SELECT
+        o.id,
+        o.order_number AS "orderNumber",
+        o.order_type AS "orderType",
+        o.order_status AS "orderStatus",
+        o.payment_status AS "paymentStatus",
+        o.subtotal,
+        o.notes,
+        o.created_at AS "createdAt",
+        o.updated_at AS "updatedAt",
+        rt.table_number AS "tableNumber",
+        COALESCE(items.items, '[]'::json) AS items
+      FROM orders o
+      LEFT JOIN restaurant_tables rt ON rt.id = o.table_id
+      LEFT JOIN LATERAL (
+        SELECT json_agg(
+          json_build_object(
+            'id', oi.id,
+            'menuItemId', oi.menu_item_id,
+            'name', oi.item_name,
+            'unitPrice', oi.unit_price,
+            'quantity', oi.quantity,
+            'lineTotal', oi.line_total,
+            'notes', oi.item_notes
+          ) ORDER BY oi.id
+        ) AS items
+        FROM order_items oi
+        WHERE oi.order_id = o.id
+      ) items ON TRUE
+      WHERE o.id = $1
+    `, [id]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found.",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Get order error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Unable to load order details.",
+    });
+  }
+});
+
+// Update an order's status.
+router.patch("/:id/status", async (req, res) => {
+  const id = Number(req.params.id);
+  const { orderStatus } = req.body || {};
+
+  if (!Number.isSafeInteger(id) || id < 1) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid order ID.",
+    });
+  }
+
+  if (!allowedStatuses.includes(orderStatus)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid order status.",
+    });
+  }
+
+  try {
+    const result = await pool.query(`
+      UPDATE orders
+      SET order_status = $1, updated_at = NOW()
+      WHERE id = $2
+      RETURNING
+        id,
+        order_number AS "orderNumber",
+        order_status AS "orderStatus",
+        updated_at AS "updatedAt"
+    `, [orderStatus, id]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found.",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Order status updated.",
+      data: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Update order status error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Unable to update order status.",
+    });
+  }
+});
+
+module.exports = router;

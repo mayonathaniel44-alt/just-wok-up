@@ -1,0 +1,426 @@
+import { useEffect, useMemo, useState } from "react";
+import "./App.css";
+
+const API_URL = "http://localhost:5000/api";
+
+const peso = (amount) =>
+  new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+  }).format(Number(amount) || 0);
+
+async function readResponse(response) {
+  try {
+    return await response.json();
+  } catch {
+    return {};
+  }
+}
+
+function App() {
+  const [categories, setCategories] = useState([]);
+  const [activeCategory, setActiveCategory] = useState("All");
+  const [cart, setCart] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const [submitting, setSubmitting] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
+  const [confirmation, setConfirmation] = useState(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadMenu() {
+      try {
+        const response = await fetch(`${API_URL}/menu`, {
+          signal: controller.signal,
+        });
+
+        const result = await readResponse(response);
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || "Could not load menu.");
+        }
+
+        setCategories(result.data || []);
+        setError("");
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          setError(
+            "Unable to load the menu. Check that the backend and database are running.",
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadMenu();
+
+    return () => controller.abort();
+  }, []);
+
+  const items = useMemo(
+    () =>
+      categories.flatMap((category) =>
+        (category.items || []).map((item) => ({
+          ...item,
+          categoryName: category.name,
+        })),
+      ),
+    [categories],
+  );
+
+  const filteredItems = items.filter((item) => {
+    const matchesCategory =
+      activeCategory === "All" ||
+      item.categoryName === activeCategory;
+
+    const matchesSearch = item.name
+      .toLowerCase()
+      .includes(search.toLowerCase());
+
+    return matchesCategory && matchesSearch;
+  });
+
+  const addToCart = (item) => {
+    setCheckoutError("");
+    setConfirmation(null);
+
+    setCart((current) => {
+      const existing = current.find((entry) => entry.id === item.id);
+
+      if (existing) {
+        if (existing.quantity >= 99) return current;
+
+        return current.map((entry) =>
+          entry.id === item.id
+            ? { ...entry, quantity: entry.quantity + 1 }
+            : entry,
+        );
+      }
+
+      return [...current, { ...item, quantity: 1 }];
+    });
+  };
+
+  const changeQuantity = (id, amount) => {
+    setCheckoutError("");
+    setConfirmation(null);
+
+    setCart((current) =>
+      current
+        .map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                quantity: Math.min(99, item.quantity + amount),
+              }
+            : item,
+        )
+        .filter((item) => item.quantity > 0),
+    );
+  };
+
+  const total = cart.reduce(
+    (sum, item) => sum + Number(item.price) * item.quantity,
+    0,
+  );
+
+  const itemCount = cart.reduce(
+    (sum, item) => sum + item.quantity,
+    0,
+  );
+
+  async function handleCheckout() {
+    if (submitting || cart.length === 0) return;
+
+    setSubmitting(true);
+    setCheckoutError("");
+    setConfirmation(null);
+
+    try {
+      const response = await fetch(`${API_URL}/orders`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          items: cart.map((item) => ({
+            menuItemId: item.id,
+            quantity: item.quantity,
+          })),
+          orderType: "takeout",
+          tableToken: null,
+          notes: notes.trim(),
+        }),
+      });
+
+      const result = await readResponse(response);
+
+      if (!response.ok || !result.success || !result.data) {
+        throw new Error(
+          result.message || "Unable to submit your order. Please try again.",
+        );
+      }
+
+      // Only clear the cart after the server confirms order creation.
+      setConfirmation(result.data);
+      setCart([]);
+      setNotes("");
+    } catch (err) {
+      setCheckoutError(
+        err.message ||
+          "Unable to reach the server. Check your connection and try again.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <a className="brand" href="#" aria-label="Just Wok Up home">
+          <span className="brand-mark">JW</span>
+          <span>
+            <strong>JUST WOK UP</strong>
+            <small>CAFÉ · ORDER ONLINE</small>
+          </span>
+        </a>
+
+        <a className="cart-link" href="#your-order">
+          Your order <span>{itemCount}</span>
+        </a>
+      </header>
+
+      <main>
+        <section className="hero">
+          <p className="eyebrow">FRESHLY MADE · MADE FOR YOU</p>
+          <h1>
+            Good food.
+            <br />
+            No waiting in line.
+          </h1>
+          <p className="hero-copy">
+            Explore the menu, customize your order, and let us handle the rest.
+          </p>
+          <div className="hero-note">
+            <span className="status-dot" />
+            <span>Online ordering</span>
+            <span className="preview-label">DEVELOPMENT</span>
+          </div>
+        </section>
+
+        <section className="menu-section">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">WHAT ARE YOU CRAVING?</p>
+              <h2>Explore the menu</h2>
+            </div>
+            <span className="item-count">{items.length} items</span>
+          </div>
+
+          <input
+            className="search-input"
+            type="search"
+            placeholder="Search dishes..."
+            aria-label="Search dishes"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+
+          <div className="category-list">
+            {["All", ...categories.map((category) => category.name)].map(
+              (category) => (
+                <button
+                  key={category}
+                  className={`category-button ${
+                    activeCategory === category ? "active" : ""
+                  }`}
+                  onClick={() => setActiveCategory(category)}
+                >
+                  {category}
+                </button>
+              ),
+            )}
+          </div>
+
+          {loading && <p className="message">Loading menu...</p>}
+          {error && <p className="error-message">{error}</p>}
+
+          {!loading && !error && filteredItems.length === 0 && (
+            <p className="message">
+              No dishes found. Try another search.
+            </p>
+          )}
+
+          <div className="menu-grid">
+            {filteredItems.map((item) => (
+              <article className="menu-card" key={item.id}>
+                <div className="dish-placeholder">
+                  <span>{item.categoryName}</span>
+                  <span className="dish-initial">
+                    {item.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+
+                <div className="dish-info">
+                  <p className="dish-category">{item.categoryName}</p>
+                  <h3>{item.name}</h3>
+                  <p className="dish-description">
+                    {item.description ||
+                      "Freshly prepared for your order."}
+                  </p>
+
+                  <div className="dish-footer">
+                    <strong>{peso(item.price)}</strong>
+                    <button
+                      className="add-button"
+                      onClick={() => addToCart(item)}
+                      aria-label={`Add ${item.name} to order`}
+                    >
+                      + Add
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="order-section" id="your-order">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">ALMOST THERE</p>
+              <h2>Your order</h2>
+            </div>
+            <span className="item-count">{cart.length} dishes</span>
+          </div>
+
+          {confirmation && (
+            <div className="checkout-success" role="status">
+              <p className="eyebrow">ORDER SUBMITTED</p>
+              <h3>Thank you for your order!</h3>
+              <p>
+                Your order number is{" "}
+                <strong>{confirmation.orderNumber}</strong>.
+              </p>
+              <p>
+                Status:{" "}
+                <strong>{confirmation.orderStatus}</strong>
+              </p>
+              <p>
+                Order total:{" "}
+                <strong>{peso(confirmation.subtotal)}</strong>
+              </p>
+              <p>
+                Payment status:{" "}
+                <strong>{confirmation.paymentStatus}</strong>
+              </p>
+              <p className="checkout-hint">
+                Your order has been recorded. Payment is not processed by this
+                checkout.
+              </p>
+            </div>
+          )}
+
+          {cart.length === 0 ? (
+            <div className="empty-cart">
+              <span className="empty-cart-icon">＋</span>
+              <strong>Your order is empty</strong>
+              <p>Add a dish from the menu to get started.</p>
+            </div>
+          ) : (
+            <>
+              <div className="cart-items">
+                {cart.map((item) => (
+                  <div className="cart-item" key={item.id}>
+                    <div className="cart-item-info">
+                      <strong>{item.name}</strong>
+                      <span>{peso(item.price)} each</span>
+                    </div>
+
+                    <div className="quantity-controls">
+                      <button
+                        onClick={() => changeQuantity(item.id, -1)}
+                        aria-label={`Remove one ${item.name}`}
+                        disabled={submitting}
+                      >
+                        −
+                      </button>
+                      <span>{item.quantity}</span>
+                      <button
+                        onClick={() => changeQuantity(item.id, 1)}
+                        aria-label={`Add one ${item.name}`}
+                        disabled={submitting || item.quantity >= 99}
+                      >
+                        +
+                      </button>
+                    </div>
+
+                    <strong className="line-total">
+                      {peso(item.price * item.quantity)}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+
+              <label className="notes-label" htmlFor="order-notes">
+                Order notes
+              </label>
+              <textarea
+                id="order-notes"
+                placeholder="Any special requests? (optional)"
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                rows={3}
+                maxLength={1000}
+                disabled={submitting}
+              />
+
+              <div className="total-row">
+                <span>Subtotal</span>
+                <strong>{peso(total)}</strong>
+              </div>
+
+              <p className="checkout-hint">
+                Takeout order · Pay at the café. Final prices are validated
+                by the server.
+              </p>
+
+              {checkoutError && (
+                <p className="error-message" role="alert">
+                  {checkoutError}
+                </p>
+              )}
+
+              <button
+                className="checkout-button"
+                onClick={handleCheckout}
+                disabled={submitting || loading || Boolean(error)}
+              >
+                {submitting
+                  ? "Submitting your order..."
+                  : `Place order · ${peso(total)}`}
+              </button>
+            </>
+          )}
+        </section>
+      </main>
+
+      <footer className="footer">
+        <strong>JUST WOK UP CAFÉ</strong>
+        <p>Life begins after coffee.</p>
+        <small>Online ordering · Development version</small>
+      </footer>
+    </div>
+  );
+}
+
+export default App;
