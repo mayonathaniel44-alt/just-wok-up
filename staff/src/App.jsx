@@ -19,6 +19,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 import MenuManagement from "./pages/MenuManagement";
+import Reports from "./pages/Reports";
+import SettingsPage from "./pages/Settings";
 import "./App.css";
 
 const navigation = [
@@ -28,7 +30,6 @@ const navigation = [
   { name: "Reports", icon: ChartNoAxesCombined },
   { name: "Settings", icon: Settings },
 ];
-
 
 const API_URL = "http://localhost:5000";
 
@@ -246,7 +247,11 @@ function App() {
             <button
               className="icon-button"
               aria-label="Notifications"
-              onClick={() => setNotice("Notifications will be connected to live orders later.")}
+              onClick={() =>
+                setNotice(
+                  "Notifications will be connected to live orders later."
+                )
+              }
             >
               <Bell size={18} />
             </button>
@@ -299,7 +304,9 @@ function App() {
                 <StatCard
                   icon={CircleDollarSign}
                   label="Order value"
-                  value={peso(orders.reduce((sum, order) => sum + order.total, 0))}
+                  value={peso(
+                    orders.reduce((sum, order) => sum + order.total, 0)
+                  )}
                   detail="Subtotal of loaded orders"
                 />
               </section>
@@ -337,7 +344,9 @@ function App() {
                       <span>Manage orders</span>
                       <ChevronRight size={16} />
                     </button>
-                    <button onClick={() => setActivePage("Menu Management")}>
+                    <button
+                      onClick={() => setActivePage("Menu Management")}
+                    >
                       <Plus size={19} />
                       <span>Manage menu</span>
                       <ChevronRight size={16} />
@@ -351,7 +360,9 @@ function App() {
                 </section>
 
                 <section className="tip-panel">
-                  <div className="tip-icon"><ShoppingBag size={21} /></div>
+                  <div className="tip-icon">
+                    <ShoppingBag size={21} />
+                  </div>
                   <p className="eyebrow">NEXT STEP</p>
                   <h2>Connect your operations.</h2>
                   <p>
@@ -377,7 +388,9 @@ function App() {
                 <div className="panel-heading">
                   <div>
                     <h2>Order queue</h2>
-                    <p>{filteredOrders.length} orders loaded from the database</p>
+                    <p>
+                      {filteredOrders.length} orders loaded from the database
+                    </p>
                   </div>
                   <div className="search-box">
                     <Search size={17} />
@@ -388,11 +401,16 @@ function App() {
                     />
                   </div>
                 </div>
-                {ordersError && <div className="empty-state">{ordersError}</div>}
+                {ordersError && (
+                  <div className="empty-state">{ordersError}</div>
+                )}
                 {ordersLoading ? (
                   <div className="empty-state">Loading orders...</div>
                 ) : (
-                  <OrderList orders={filteredOrders} onUpdate={updateStatus} />
+                  <OrderList
+                    orders={filteredOrders}
+                    onUpdate={updateStatus}
+                  />
                 )}
               </section>
             </>
@@ -400,31 +418,9 @@ function App() {
 
           {activePage === "Menu Management" && <MenuManagement />}
 
-        {activePage === "Reports" && (
-            <section className="content-panel placeholder-page">
-              <div className="placeholder-icon"><ChartNoAxesCombined size={24} /></div>
-              <p className="eyebrow">BUSINESS INSIGHTS</p>
-              <h1>Reports</h1>
-              <p>
-                Sales totals, order volume, popular items, and date filters
-                will be calculated from actual database records once connected.
-              </p>
-              <span className="preview-tag">Integration pending</span>
-            </section>
-          )}
+          {activePage === "Reports" && <Reports />}
 
-          {activePage === "Settings" && (
-            <section className="content-panel placeholder-page">
-              <div className="placeholder-icon"><Settings size={24} /></div>
-              <p className="eyebrow">WORKSPACE PREFERENCES</p>
-              <h1>Settings</h1>
-              <p>
-                Staff accounts, access permissions, café details, and
-                operational preferences will be configured here.
-              </p>
-              <span className="preview-tag">Integration pending</span>
-            </section>
-          )}
+          {activePage === "Settings" && <SettingsPage />}
         </div>
       </main>
     </div>
@@ -436,7 +432,9 @@ function StatCard({ icon: Icon, label, value, detail }) {
     <article className="stat-card">
       <div className="stat-top">
         <span>{label}</span>
-        <div className="stat-icon"><Icon size={19} /></div>
+        <div className="stat-icon">
+          <Icon size={19} />
+        </div>
       </div>
       <strong className="stat-value">{value}</strong>
       <span className="stat-detail">{detail}</span>
