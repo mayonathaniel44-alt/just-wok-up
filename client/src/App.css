@@ -767,3 +767,227 @@ textarea {
     align-self: flex-start;
   }
 }
+
+/* Mobile responsive improvements */
+.app-shell {
+  width: 100%;
+  overflow-x: clip;
+}
+
+main {
+  width: min(1120px, 90%);
+}
+
+.topbar,
+.section-heading,
+.dish-footer,
+.running-tab,
+.ticket-header,
+.ticket-item,
+.ticket-total {
+  min-width: 0;
+}
+
+.menu-card,
+.dish-info,
+.cart-item-info,
+.ticket-card {
+  min-width: 0;
+}
+
+.dish-info h3,
+.dish-description,
+.cart-item-info strong,
+.ticket-item span {
+  overflow-wrap: anywhere;
+}
+
+.search-input,
+textarea,
+.checkout-button {
+  max-width: 100%;
+}
+
+button,
+input,
+textarea {
+  touch-action: manipulation;
+}
+
+/* Tablet */
+@media (max-width: 800px) {
+  main {
+    width: 92%;
+  }
+
+  .menu-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .section-heading h2 {
+    font-size: clamp(25px, 5vw, 32px);
+  }
+}
+
+/* Smartphone */
+@media (max-width: 520px) {
+  .topbar {
+    padding: 0 4%;
+    gap: 10px;
+  }
+
+  .brand {
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .brand strong {
+    letter-spacing: 1px;
+  }
+
+  .cart-link {
+    gap: 6px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  main {
+    width: 92%;
+  }
+
+  .hero {
+    padding: 42px 0 32px;
+  }
+
+  .hero h1 {
+    font-size: clamp(36px, 10vw, 45px);
+    letter-spacing: -1.5px;
+  }
+
+  .hero-copy {
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  .menu-section,
+  .order-section {
+    padding: 35px 0;
+  }
+
+  .section-heading {
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .section-heading h2 {
+    font-size: 27px;
+  }
+
+  .item-count {
+    flex-shrink: 0;
+    font-size: 11px;
+  }
+
+  .menu-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .dish-placeholder {
+    height: 145px;
+  }
+
+  .dish-info {
+    padding: 17px;
+  }
+
+  .category-list {
+    gap: 8px;
+  }
+
+  .category-button {
+    padding: 10px 13px;
+  }
+
+  .cart-item {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+  }
+
+  .cart-item-info {
+    overflow-wrap: anywhere;
+  }
+
+  .quantity-controls {
+    gap: 9px;
+  }
+
+  .line-total {
+    grid-column: 1;
+    text-align: left;
+    min-width: 0;
+  }
+
+  .quantity-controls button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .running-tab {
+    gap: 12px;
+    padding: 17px;
+  }
+
+  .running-tab-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .ticket-card {
+    padding: 16px;
+  }
+
+  .ticket-item,
+  .ticket-total {
+    gap: 10px;
+  }
+
+  .checkout-success {
+    padding: 16px;
+    overflow-wrap: anywhere;
+  }
+
+  .checkout-button {
+    min-height: 48px;
+  }
+
+  .footer {
+    padding: 30px 5%;
+  }
+}
+
+/* Very small smartphones */
+@media (max-width: 360px) {
+  .brand-mark {
+    width: 32px;
+    height: 32px;
+  }
+
+  .brand strong {
+    font-size: 9px;
+  }
+
+  .brand small {
+    font-size: 7px;
+    letter-spacing: 0.5px;
+  }
+
+  .cart-link {
+    font-size: 11px;
+  }
+
+  .section-heading h2 {
+    font-size: 24px;
+  }
+}
